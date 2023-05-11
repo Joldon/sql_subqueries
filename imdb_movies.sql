@@ -1,12 +1,6 @@
 USE imdb_ijs;
 
-select * from actors;
 
-
-
-
-select * from movies_genres;
-select * from roles;
 
 /* How many actors are there in the actors table?
 How many directors are there in the directors table?
@@ -46,16 +40,9 @@ FROM movies
 GROUP BY name
 ORDER BY count DESC; -- Eurovision Song Contest, The
 
-/* Understanding the database
 
 
-
-
-Are there movies with more than one “genre”?
-*/
-
-
-
+-- UNDERSTANDING THE DATABASE
 -- Are there movies with multiple directors?
 SELECT m.name AS movie_name, COUNT(DISTINCT d.id) AS director_count
 FROM movies AS m
@@ -93,16 +80,87 @@ GROUP BY m.name, m.year
 HAVING director_count > 1
 ORDER BY director_count DESC;
 
+
+
+-- shows number of actors count per movie
+SELECT m.name AS movie_name, COUNT(DISTINCT a.id) AS actor_count
+FROM movies AS m
+JOIN roles AS r ON m.id = r.movie_id
+JOIN actors AS a ON r.actor_id = a.id
+GROUP BY m.id;
+
+-- On average, how many actors are listed by movie?
+SELECT AVG(actor_count) AS average_actors_per_movie
+FROM (
+  SELECT m.id AS movie_id, COUNT(DISTINCT a.id) AS actor_count
+  FROM movies AS m
+  JOIN roles AS r ON m.id = r.movie_id
+  JOIN actors AS a ON r.actor_id = a.id
+  GROUP BY m.id
+) AS actor_counts; -- 11.4287
+
+
+-- Are there movies with more than one “genre”?
+
+-- this probably selects correctly but displays only id and name columns
+SELECT m.id, m.name
+FROM movies AS m
+JOIN movies_genres AS mg ON m.id = mg.movie_id
+GROUP BY m.id, m.name
+HAVING COUNT(DISTINCT mg.genre) > 1;
+
+-- this uses GROUP_CONCAT and outputs also genres per movie 
+SELECT m.id, m.name, mg.genre
+FROM movies AS m
+JOIN (
+    SELECT movie_id, GROUP_CONCAT(genre SEPARATOR ', ') AS genre
+    FROM (
+        SELECT DISTINCT movie_id, genre
+        FROM movies_genres
+    ) AS mg
+    GROUP BY movie_id
+    HAVING COUNT(*) > 1
+) AS mg
+ON m.id = mg.movie_id;
+/*
+The below query joins the movies table with the movies_genres table twice, using different aliases (mg1 and mg2). 
+The first join matches the movies with their genres, and the second join matches the movies with other genres 
+that are different from the first one. The query then selects only 
+the distinct combinations of id, name, and the two genres. 
+This will give us all movies that have at least two different genres.
+*/
+SELECT DISTINCT m.id, m.name, mg1.genre, mg2.genre
+FROM movies AS m
+JOIN movies_genres AS mg1 ON m.id = mg1.movie_id
+JOIN movies_genres AS mg2 ON mg1.movie_id = mg2.movie_id AND mg1.genre <> mg2.genre;
+
+/*
+Looking for specific movies
+
+
+Who directed it?
+Which actors where casted on it?
+Can you find the movie called “La Dolce Vita”?
+Who directed it?
+Which actors where casted on it?
+When was the movie “Titanic” by James Cameron released?
+Hint: there are many movies named “Titanic”. We want the one directed by James Cameron.
+Hint 2: the name “James Cameron” is stored with a weird character on it.
+*/
+
 select * from movies_directors;
 select * from directors;
 select * from movies;
 select * from directors_genres;
--- On average, how many actors are listed by movie?
+select * from actors;
+select * from movies_genres;
+select * from roles;
 
+-- Can you find the movie called “Pulp Fiction” 
+SELECT name
+FROM movies
+WHERE name='Pulp Fiction';
 
+-- Who directed it?
+SELECT 
 
-
-
-
-
- 
