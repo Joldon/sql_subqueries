@@ -31,6 +31,15 @@ where year IN (1888, 2008);
 -- Roundhay Garden Scene 1888
 -- Traffic Crossing Leeds Bridge 1888
 
+/* 
+Hulyas solution
+SELECT `year` FROM movies
+ORDER BY `year` DESC;
+
+SELECT `year`, `name` FROM movies
+WHERE `year`='2008' OR `year`='1888';
+*/
+
 select MIN(`rank`), MAX(`rank`)
 from movies
 where `rank` IS NOT NULL; -- 1, 9.9
@@ -39,7 +48,7 @@ SELECT name, COUNT(*) as count
 FROM movies
 GROUP BY name
 ORDER BY count DESC; -- Eurovision Song Contest, The
-
+-- Limit 1 if you want to see exactly that item
 
 
 -- UNDERSTANDING THE DATABASE
@@ -62,13 +71,14 @@ GROUP BY m.name
 ORDER BY director_count DESC;
 
 -- this code separates movies with the same name but with different years treating them as separate entities
--- but does sort them by number of directors
+-- but there are the same number of directors
 SELECT m.name AS movie_name, m.year, COUNT(DISTINCT d.id) AS director_count
 FROM movies AS m
 INNER JOIN movies_directors AS md ON m.id = md.movie_id
 INNER JOIN directors AS d ON md.director_id = d.id
 GROUP BY m.name, m.year
-HAVING director_count > 1;
+HAVING director_count > 1
+ORDER BY COUNT(DISTINCT d.id) DESC;
 
 -- this code sorts the list by number of directors but there is another error because teh least number of directors is 9
 -- which is not realistic. Check what causes this bug
@@ -103,11 +113,12 @@ FROM (
 -- Are there movies with more than one “genre”?
 
 -- this probably selects correctly but displays only id and name columns
-SELECT m.id, m.name
+SELECT m.id, m.name, COUNT(mg.genre)
 FROM movies AS m
 JOIN movies_genres AS mg ON m.id = mg.movie_id
 GROUP BY m.id, m.name
-HAVING COUNT(DISTINCT mg.genre) > 1;
+HAVING COUNT(DISTINCT mg.genre) > 1
+ORDER BY COUNT(mg.genre) DESC;
 
 -- this uses GROUP_CONCAT and outputs also genres per movie 
 SELECT m.id, m.name, mg.genre
@@ -144,7 +155,7 @@ FROM movies
 WHERE name='Pulp Fiction';
 
 -- Who directed it?
-SELECT d.first_name, d.last_name
+SELECT m.name, d.first_name, d.last_name
 FROM directors AS d
 JOIN movies_directors as md
 ON d.id=md.director_id
@@ -153,12 +164,7 @@ ON md.movie_id=m.id
 WHERE m.name = 'Pulp Fiction';
 
 select * from movies_directors;
-select * from directors;
-select * from movies;
-select * from directors_genres;
-select * from actors;
-select * from movies_genres;
-select * from roles;
+
 -- Which actors where casted on it?
 
 SELECT a.first_name, a.last_name
@@ -207,7 +213,7 @@ where m.name = 'Dolce vita, La';
 Hint: there are many movies named “Titanic”. We want the one directed by James Cameron.
 Hint 2: the name “James Cameron” is stored with a weird character on it.*/
 
-SELECT *
+SELECT year, m.name
 FROM movies as m
 JOIN movies_directors as md
 ON m.id = md.movie_id
@@ -215,5 +221,73 @@ JOIN directors as d
 ON md.director_id = d.id
 WHERE m.name = 'Titanic' AND (LOWER(d.first_name)LIKE '%James%' AND LOWER(d.last_name) LIKE '%Cameron%')
 ;
+
+-- Actors and directors
+
+-- Who is the actor that acted more times as “Himself”?
+SELECT COUNT(a.id), a.first_name, a.last_name
+FROM actors AS a
+JOIN roles as r
+	ON r.actor_id = a.id
+-- WHERE r.role = LOWER('Himself') this one loses some values that appear together with himself
+WHERE r.role LIKE '%Himself%'
+GROUP BY a.id
+ORDER BY COUNT(a.id) DESC
+LIMIT 5;
+
+
+select * from directors;
+select * from movies;
+select * from directors_genres;
+select * from actors;
+select * from movies_genres;
+select * from roles;
+-- What is the most common name for actors? 
+SELECT COUNT(first_name), first_name
+FROM actors
+GROUP BY first_name
+ORDER BY COUNT(first_name) DESC
+;
+
+SELECT COUNT(last_name), last_name
+FROM actors
+GROUP BY last_name
+ORDER BY COUNT(last_name) DESC
+;
+
+WITH concat_names as (SELECT 
+    concat(first_name,' ',last_name) fullname
+FROM
+	actors)
+SELECT fullname, COUNT(fullname)
+FROM concat_names
+GROUP BY 1
+ORDER BY 2 DESC;
+
+-- And for directors?
+SELECT COUNT(first_name), first_name
+FROM directors
+GROUP BY 2
+ORDER BY 1 DESC
+LIMIT 10
+;
+
+SELECT COUNT(last_name), last_name
+FROM directors
+GROUP BY 2
+ORDER BY 1 DESC
+LIMIT 10;
+
+-- concat and with
+WITH concat_names AS (SELECT 
+	concat(first_name, ' ', last_name) AS fullname
+FROM directors)
+SELECT COUNT(fullname), fullname
+FROM concat_names
+GROUP BY 2
+ORDER BY 1 DESC
+;
+
+
 
 
