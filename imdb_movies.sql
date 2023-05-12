@@ -136,17 +136,21 @@ JOIN movies_genres AS mg2 ON mg1.movie_id = mg2.movie_id AND mg1.genre <> mg2.ge
 
 /*
 Looking for specific movies
-
-
-Who directed it?
-Which actors where casted on it?
-Can you find the movie called “La Dolce Vita”?
-Who directed it?
-Which actors where casted on it?
-When was the movie “Titanic” by James Cameron released?
-Hint: there are many movies named “Titanic”. We want the one directed by James Cameron.
-Hint 2: the name “James Cameron” is stored with a weird character on it.
 */
+
+-- Can you find the movie called “Pulp Fiction” 
+SELECT name
+FROM movies
+WHERE name='Pulp Fiction';
+
+-- Who directed it?
+SELECT d.first_name, d.last_name
+FROM directors AS d
+JOIN movies_directors as md
+ON d.id=md.director_id
+JOIN movies as m
+ON md.movie_id=m.id
+WHERE m.name = 'Pulp Fiction';
 
 select * from movies_directors;
 select * from directors;
@@ -155,12 +159,61 @@ select * from directors_genres;
 select * from actors;
 select * from movies_genres;
 select * from roles;
+-- Which actors where casted on it?
 
--- Can you find the movie called “Pulp Fiction” 
+SELECT a.first_name, a.last_name
+FROM actors as a
+RIGHT JOIN roles as r
+ON a.id = r.actor_id
+JOIN movies as m
+ON m.id=r.movie_id
+WHERE m.name = 'Pulp Fiction';
+
+-- Can you find the movie called “La Dolce Vita”?
+
+-- this query to find movie 'La Dolce Vita', with normal query does not find it
 SELECT name
 FROM movies
-WHERE name='Pulp Fiction';
+WHERE name='La Dolce Vita';
+SELECT name
+FROM movies
+WHERE LOWER(name) LIKE '%dolce%';
+
+-- and then next step is:
+SELECT name
+FROM movies
+WHERE name = 'Dolce vita, La';
 
 -- Who directed it?
-SELECT 
+SELECT d.first_name, d.last_name
+FROM directors as d
+RIGHT JOIN movies_directors as md
+ON d.id = md.director_id
+LEFT JOIN movies as m
+ON md.movie_id = m.id
+WHERE m.name = 'Dolce vita, La';
+
+-- Which actors where casted on it?
+SELECT a.first_name, a.last_name, r.actor_id
+FROM actors as a
+LEFT JOIN roles as r
+ON a.id = r.actor_id
+RIGHT JOIN movies as m
+ON m.id = r.movie_id
+where m.name = 'Dolce vita, La';
+
+
+/* When was the movie “Titanic” by James Cameron released?
+Hint: there are many movies named “Titanic”. We want the one directed by James Cameron.
+Hint 2: the name “James Cameron” is stored with a weird character on it.*/
+
+SELECT *
+FROM movies as m
+JOIN movies_directors as md
+ON m.id = md.movie_id
+JOIN directors as d
+ON md.director_id = d.id
+WHERE m.name = 'Titanic' AND (LOWER(d.first_name)LIKE '%James%' AND LOWER(d.last_name) LIKE '%Cameron%')
+;
+
 
