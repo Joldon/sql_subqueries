@@ -236,12 +236,6 @@ ORDER BY COUNT(a.id) DESC
 LIMIT 5;
 
 
-select * from directors;
-select * from movies;
-select * from directors_genres;
-select * from actors;
-select * from movies_genres;
-select * from roles;
 -- What is the most common name for actors? 
 SELECT COUNT(first_name), first_name
 FROM actors
@@ -287,6 +281,297 @@ FROM concat_names
 GROUP BY 2
 ORDER BY 1 DESC
 ;
+
+-- Analysing genders
+
+
+-- How many actors are male and how many are female?
+SELECT COUNT(id), gender
+FROM actors
+GROUP BY gender
+; -- M 513306, F = 304412
+
+-- What percentage of actors are female, and what percentage are male?
+SELECT 
+(SELECT COUNT(id)
+FROM actors
+WHERE gender LIKE '%f%')
+/
+(SELECT COUNT(id)
+FROM actors)
+; -- 0.3723 37% females
+
+-- Movies across time
+
+-- How many of the movies were released after the year 2000?
+SELECT *
+FROM movies
+WHERE year >= 2001;
+
+
+-- How many of the movies where released between the years 1990 and 2000?
+SELECT name, year
+FROM movies
+WHERE year BETWEEN 1990 AND 2000
+;
+-- Which are the 3 years with the most movies? How many movies were produced on those years?
+SELECT COUNT(year), year
+FROM movies
+GROUP BY year
+ORDER BY COUNT(year) DESC
+LIMIT 3
+;
+
+-- with window function and WITH
+WITH cte AS (SELECT
+	RANK() OVER (ORDER BY COUNT(id) DESC) ranking,
+    year,
+    count(id) total
+FROM movies
+GROUP BY year
+ORDER BY 1)
+SELECT ranking, year, total
+FROM cte
+WHERE ranking <= 3;
+
+-- What are the top 5 movie genres?
+SELECT COUNT(genre), genre
+FROM movies_genres
+GROUP BY genre
+ORDER BY COUNT(genre) DESC
+LIMIT 5
+;
+
+-- with window function and WITH
+WITH cte AS (SELECT
+	RANK() OVER (ORDER BY COUNT(movie_id) DESC) ranking,
+    genre,
+    COUNT(movie_id) total
+FROM movies_genres
+GROUP BY genre
+ORDER BY 1)
+SELECT ranking, genre, total
+FROM cte
+WHERE ranking <= 5;
+
+
+-- What are the top 5 movie genres before 1920?
+SELECT COUNT(genre), genre
+FROM movies_genres
+WHERE year <= 1920
+GROUP BY genre
+ORDER BY COUNT(genre) DESC
+;
+
+
+WITH century_movies AS (
+SELECT COUNT(genre), genre
+FROM movies_genres
+GROUP BY genre
+ORDER BY COUNT(genre) DESC
+LIMIT 5)
+SELECT genre
+FROM century_movies
+;
+-- WITH old_movies AS (
+-- SELECT movies
+-- WHERE year <= 1920)
+-- SELECT COUNT(genre), genre
+-- FROM movies_genres
+-- WHERE genre IN (old_movies)
+-- ;
+
+-- working solution
+SELECT COUNT(mg.genre) AS genre_count, mg.genre
+FROM movies_genres AS mg
+WHERE mg.movie_id IN (
+    SELECT id
+    FROM movies
+    WHERE year <= 1920
+)
+GROUP BY mg.genre
+ORDER BY genre_count DESC
+LIMIT 5;
+
+
+
+-- with window function and WITH
+WITH cte AS (SELECT
+	RANK() OVER (ORDER BY COUNT(movie_id) DESC) ranking,
+    genre,
+    COUNT(movie_id) total
+FROM movies_genres
+WHERE movie_id IN (SELECT id FROM movies WHERE year < 1920)
+GROUP BY genre
+ORDER BY 1)
+SELECT ranking, genre, total
+FROM cte
+WHERE ranking <= 5;
+
+-- What is the evolution of the top movie genres across all the decades of the 20th century?
+with genre_count_per_decade as (
+select rank() over (partition by decade order by movies_per_genre desc) ranking, genre, decade
+from (SELECT 
+    genre,
+    FLOOR(m.year / 10) * 10 AS decade,
+    COUNT(genre) AS movies_per_genre
+FROM
+    movies_genres mg
+        JOIN
+    movies m ON m.id = mg.movie_id
+GROUP BY decade , genre) as a
+)
+select genre, decade
+FROM genre_count_per_decade
+WHERE ranking = 1;
+
+
+
+-- preliminary step
+with temp_actors as (
+    select 
+        *,
+        concat(first_name, ' ', last_name) as full_name
+    from actors
+    order by full_name
+    limit 2000
+    ),
+temp_movies as (
+    select 
+        *,
+        floor(year / 10) * 10 as decade
+    from movies
+    limit 2000
+    ),
+decade_count as (
+    select tm.decade, ta.full_name, count(ta.full_name) as full_name_count
+    from temp_actors ta
+    join roles r
+        on ta.id = r.actor_id
+    join temp_movies tm
+        on r.movie_id = tm.id
+    where tm.`year` between 1900 and 2000
+    group by tm.decade, ta.full_name
+)
+
+select decade, max(full_name_count)
+from decade_count
+group by decade;
+
+
+
+-- Joan's solution
+with temp_actors as (
+    select 
+        *,
+        concat(first_name, ' ', last_name) as full_name
+    from actors
+    order by full_name
+    -- limit 2000
+    ),
+temp_movies as (
+    select 
+        *,
+        floor(year / 10) * 10 as decade
+    from movies
+    -- limit 2000
+    ),
+decade_count as (
+    select tm.decade, ta.full_name, count(ta.full_name) as full_name_count
+    from temp_actors ta
+    join roles r
+        on ta.id = r.actor_id
+    join temp_movies tm
+        on r.movie_id = tm.id
+    where tm.`year` between 1900 and 2000
+    group by tm.decade, ta.full_name
+),
+ranked_actors as (
+    select 
+        decade, full_name, full_name_count,
+        row_number() over (partition by decade order by full_name_count desc) as rn
+    from decade_count
+)
+
+select * 
+from ranked_actors
+where rn = 1
+order by decade;
+
+
+select * from directors;
+select * from movies;
+select * from directors_genres;
+select * from actors;
+select * from movies_genres;
+select * from roles;
+
+
+-- Get the most common actor name for each decade in the XX century.
+
+WITH temp_actors AS ( -- the below query is probably not correct
+    SELECT *,
+        CONCAT(first_name, ' ', last_name) AS full_name
+    FROM actors
+    ORDER BY full_name
+    LIMIT 2000    
+),
+temp_movies AS (
+    SELECT *,
+        FLOOR(year / 10) * 10 AS decade
+    FROM movies
+    LIMIT 2000
+),
+decade_count AS (
+    SELECT
+        tm.decade,
+        ta.full_name,
+        COUNT(*) AS full_name_count
+    FROM temp_movies tm
+    JOIN roles r ON tm.id = r.movie_id
+    JOIN temp_actors ta ON r.actor_id = ta.id
+    WHERE tm.year BETWEEN 1900 AND 1999
+    GROUP BY tm.decade, ta.full_name
+),
+ranked_actors AS (
+    SELECT
+        decade,
+        full_name,
+        full_name_count,
+        ROW_NUMBER() OVER (PARTITION BY decade ORDER BY full_name_count DESC) AS rn
+    FROM decade_count
+)
+SELECT
+    decade,
+    full_name,
+    full_name_count
+FROM ranked_actors
+WHERE rn = 1
+ORDER BY decade;
+
+-- the below is from official solution
+with cte as (
+SELECT RANK() OVER (PARTITION BY DECADE ORDER BY TOTALS DESC) AS ranking, 
+	fname, 
+	totals, 
+	decade
+from (SELECT a.first_name as fname, 
+	COUNT(a.first_name) as totals, 
+	FLOOR(m.year / 10) * 10 as decade
+FROM actors a
+JOIN roles r
+	ON a.id = r.actor_id
+JOIN movies m
+	ON r.movie_id = m.id
+GROUP BY decade, fname) sub)
+SELECT decade, 
+	fname, 
+	totals
+FROM cte
+WHERE ranking = 1
+-- AND decade >= 1900
+-- AND decade < 1900
+ORDER BY decade;
 
 
 
